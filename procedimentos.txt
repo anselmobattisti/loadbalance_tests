@@ -1,0 +1,20 @@
+mininet net.py
+
+h1 e h2 rodam o servidor 
+
+h3 python fluxo.py
+
+enviar o fluxo de dados
+
+./pox.py log.level --DEBUG misc.ip_loadbalancer --ip=10.0.1.1 --servers=10.0.0.1,10.0.0.2,10.0.0.3,10.0.0.4,10.0.0.5
+
+teste foi feito com o ab 
+apt-get install apache2-utils
+
+h6 ab -n 500 -c 50 http://10.0.1.1/
+
+
+https://cleitonbueno.com/python-webserver-em-um-minuto/
+
+
+https://www.beyondthelines.net/computing/load-balancing-strategies/
