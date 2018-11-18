@@ -1,0 +1,1 @@
+wilcox.test(dados_4$Round.Robin, dados_4$Round.Robin.Weight, paired = TRUE, exact = FALSE, conf.int = TRUE, conf.level = 0.95)

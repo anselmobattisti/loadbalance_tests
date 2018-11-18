@@ -38,12 +38,21 @@ def myNetwork():
     h6 = net.addHost('h6', cls=Host, ip='10.0.0.6', defaultRoute=None, mac='00:00:00:00:00:06' )
 
     info( '*** Add links\n')
-    net.addLink(h1, s1)
-    net.addLink(h2, s1, bw=1)
-    net.addLink(h3, s1, bw=2)
-    net.addLink(h4, s1, bw=4)
-    net.addLink(h5, s1, bw=8)
-    net.addLink(h6, s1, bw=16)
+    # balanceado
+    # net.addLink(h1, s1, bw=10)
+    # net.addLink(h2, s1, bw=10)
+    # net.addLink(h3, s1, bw=10)
+    # net.addLink(h4, s1, bw=10)
+    # net.addLink(h5, s1, bw=10)
+    # net.addLink(h6, s1, bw=100)
+    
+    net.addLink(h1, s1, bw=5)
+    net.addLink(h2, s1, bw=5)
+    net.addLink(h3, s1, bw=7.5)
+    net.addLink(h4, s1, bw=10)
+    net.addLink(h5, s1, bw=10)
+    net.addLink(h6, s1, bw=100)
+    
     # net.addLink(s1, s2, bw=0.1) #port 1
     # net.addLink(s1, s2, bw=10) #port 2
     
@@ -55,11 +64,10 @@ def myNetwork():
 
     info( '*** Starting switches\n')
     net.get('s1').start([c0])
-
-    # inicia os https nos servidores
+   
     net.get('h1').popen('python -m SimpleHTTPServer 80')
     net.get('h2').popen('python -m SimpleHTTPServer 80')
-    net.get('h3').popen('python -m SimpleHTTPServer 80')
+    net.get('h3').popen('python -m SimpleHTTPServer 80')      
     net.get('h4').popen('python -m SimpleHTTPServer 80')
     net.get('h5').popen('python -m SimpleHTTPServer 80')
     
@@ -69,4 +77,3 @@ def myNetwork():
 if __name__ == '__main__':
     setLogLevel( 'info' )
     myNetwork()
-

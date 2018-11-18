@@ -41,11 +41,18 @@ import random
 FLOW_IDLE_TIMEOUT = 10
 FLOW_MEMORY_TIMEOUT = 60 * 5
 
+#strategy r = random (default); rr = Round Robin; rrw = Round Robin Weight
+RANDON = 'r'
+ROUND_ROBIN = 'rr'
+ROUND_ROBIN_WEIGHT = 'rrw'
+
+strategy_choosed = RANDON
+
 # it will be the server who will serve the client
 server_num = -1
 
-# fixed change to choose a server
-server_chance = [IPAddress('10.0.0.1'),'10.0.0.2','10.0.0.3','10.0.0.4','10.0.0.4','10.0.0.5','10.0.0.5','10.0.0.5','10.0.0.5']
+# the order of choosing server in round robin weight
+server_order = []
 
 class MemoryEntry (object):
   """
@@ -195,41 +202,52 @@ class iplb (object):
     r = max(.25, r) # Cap it at four per second
     return r
 
-  def _pick_server (self, key, inport):
-    """
-    Pick a server for a (hopefully) new connection
-    """
-    
+  def _pick_server_random (self, key, inport):
     """
     Strategy 1 - Random
-    ""
-    return random.choice(self.live_servers.keys())
     """
+    return random.choice(self.live_servers.keys())
 
     
+  def _pick_server_round_robin (self, key, inport):  
     """
     Strategy 2 - Using queue
-    ""
-    global server_num
+    """
+    global server_num, len_live_servers
     server_num = server_num + 1 
 
-    if server_num >= len(self.live_servers.keys()):
+    if server_num >= len_live_servers:
       server_num = 0
 
-    print(server_num)
     return self.live_servers.keys()[server_num]
-    """
-    
-    """
-    Strategy 3 - Change by Bandwidth     
-    """
-    # print(self.live_servers.keys())
-    global server_chance
-    ip_server = random.choice(server_chance)
-    return self.live_servers[ip_server[0]]
     
 
+  def _pick_server_round_robin_weight (self, key, inport):  
+    """
+    Strategy 3 - Round Robin using weight
+    """
+    global server_order, server_num, len_server_order
+
+    server_num = server_num + 1 
+
+    if server_num >= len_server_order:
+      server_num = 0
+
+    """
+    print('----------')
+    print(server_num)
+    print(len_server_order)
+    print(server_order)
+    print(server_order[server_num])
+    print(self.sorted_live_servers)
+    print('----------')
+    """
+    
+    return self.sorted_live_servers[server_order[server_num]][0]
+    
   def _handle_PacketIn (self, event):
+    global strategy_choosed, len_live_servers
+
     inport = event.port
     packet = event.parsed
 
@@ -260,6 +278,8 @@ class iplb (object):
 
               # sorted list by MAC
               self.sorted_live_servers = sorted(self.live_servers.items(), key=lambda kv: kv[1])            
+              
+              len_live_servers = len(self.live_servers)
         return
 
       # Not TCP and not ARP.  Don't know what to do with this.  Drop it.
@@ -316,7 +336,15 @@ class iplb (object):
           return drop()
 
         # Pick a server for this flow
-        server = self._pick_server(key, inport)
+        if strategy_choosed == RANDON:
+          server = self._pick_server_random(key, inport)
+        
+        if strategy_choosed == ROUND_ROBIN:
+          server = self._pick_server_round_robin(key, inport)
+
+        if strategy_choosed == ROUND_ROBIN_WEIGHT:
+          server = self._pick_server_round_robin_weight(key, inport)          
+
         self.log.debug("Directing traffic to %s", server)
         entry = MemoryEntry(server, packet, inport)
         self.memory[entry.key1] = entry
@@ -347,15 +375,41 @@ class iplb (object):
 _dpid = None
 
 
-def launch (ip, servers, dpid = None):
-  global _dpid
+def launch (ip, servers, strategy = RANDON, dpid = None):
+  global _dpid, strategy_choosed, server_order, len_server_order
   if dpid is not None:
     _dpid = str_to_dpid(dpid)
 
-  servers = servers.replace(","," ").split()
-  servers = [IPAddr(x) for x in servers]
-  ip = IPAddr(ip)
+  if strategy is not None:
+    strategy_choosed = strategy
+    
+  if strategy_choosed != RANDON and strategy_choosed != ROUND_ROBIN and strategy_choosed != ROUND_ROBIN_WEIGHT:
+    strategy_choosed = RANDON
+    log.warning('The strategy {} is not a validy stratery. Random strategy was put in place.'.format(strategy));
 
+  log.info('Strategy {} used.'.format(strategy_choosed));
+
+  if strategy_choosed == ROUND_ROBIN_WEIGHT:
+    s = servers.replace(","," ").split()
+    servers = []
+
+    for i, server in enumerate(s):
+      server = server.split(':')
+      servers.append(IPAddr(server[0]))
+      
+      if len(server) == 1:
+        server_order.append(i)
+      else:
+        for k in range(0,int(server[1])):
+          server_order.append(i)
+    
+    len_server_order = len(server_order)
+    log.info('Server ordering {}'.format(server_order))
+
+  else:
+    servers = servers.replace(","," ").split()
+    servers = [IPAddr(x) for x in servers]
+    ip = IPAddr(ip)
 
   # We only want to enable ARP Responder *only* on the load balancer switch,
   # so we do some disgusting hackery and then boot it up.
